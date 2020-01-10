@@ -1,0 +1,27 @@
+From 6115415290d586c3bba2ecd871ae2256c0549dcf Mon Sep 17 00:00:00 2001
+From: Aron Xu <happyaron.xu@gmail.com>
+Date: Fri, 20 Jul 2012 15:41:34 +0800
+Subject: [PATCH] Fix an error in previous commit
+To: libvir-list@redhat.com
+
+Signed-off-by: Daniel Veillard <veillard@redhat.com>
+---
+ entities.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/entities.c b/entities.c
+index 859ec3b..7d06820 100644
+--- a/entities.c
++++ b/entities.c
+@@ -529,7 +529,7 @@ xmlGetDocEntity(xmlDocPtr doc, const xmlChar *name) {
+  */
+ #define growBufferReentrant() {						\
+     xmlChar *tmp;                                                       \
+-    size_t new_size = buffer_size *= 2;                                 \
++    size_t new_size = buffer_size * 2;                                  \
+     if (new_size < buffer_size) goto mem_error;                         \
+     tmp = (xmlChar *) xmlRealloc(buffer, new_size);	                \
+     if (tmp == NULL) goto mem_error;                                    \
+-- 
+1.7.11.2
+

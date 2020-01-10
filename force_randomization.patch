@@ -1,0 +1,28 @@
+diff --git a/dict.c b/dict.c
+index d73d230..bd64afb 100644
+--- a/dict.c
++++ b/dict.c
+@@ -26,6 +26,9 @@
+ #include <time.h>
+ #endif
+ 
++/* Force randomization even if configure wasn't regenerated */
++#define DICT_RANDOMIZATION
++
+ /*
+  * Following http://www.ocert.org/advisories/ocert-2011-003.html
+  * it seems that having hash randomization might be a good idea
+diff --git a/hash.c b/hash.c
+index 02e01fb..ba36e15 100644
+--- a/hash.c
++++ b/hash.c
+@@ -28,6 +28,9 @@
+ #include <time.h>
+ #endif
+ 
++/* Force randomization even if configure wasn't regenerated */
++#define HASH_RANDOMIZATION
++
+ /*
+  * Following http://www.ocert.org/advisories/ocert-2011-003.html
+  * it seems that having hash randomization might be a good idea

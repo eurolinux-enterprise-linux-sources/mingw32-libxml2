@@ -1,0 +1,310 @@
+From 4ac0f58b09693f4e646978b9c752fec383d0a79b Mon Sep 17 00:00:00 2001
+From: Daniel Veillard <veillard@redhat.com>
+Date: Mon, 30 Jul 2012 10:08:45 +0800
+Subject: [PATCH] Introduce some default parser limits
+To: libvir-list@redhat.com
+
+Those can be overrided by the XML_PARSE_HUGE option, they
+are just default limits for Name lenght, dictionary size limits
+and maximum amount of parser lookup.
+* include/libxml/parserInternals.h: define the limits
+* include/libxml/xmlerror.h: add a new error
+* parser.c parserInternals.c: implements the new limits
+
+Signed-off-by: Daniel Veillard <veillard@redhat.com>
+---
+ include/libxml/parserInternals.h | 35 ++++++++++++++++-
+ include/libxml/xmlerror.h        |  1 +
+ parser.c                         | 84 ++++++++++++++++++++++++++++++++++++++--
+ parserInternals.c                |  2 +
+ 4 files changed, 118 insertions(+), 4 deletions(-)
+
+diff --git a/include/libxml/parserInternals.h b/include/libxml/parserInternals.h
+index a5e75b5..d6dcb26 100644
+--- a/include/libxml/parserInternals.h
++++ b/include/libxml/parserInternals.h
+@@ -1,5 +1,5 @@
+ /*
+- * Summary: internals routines exported by the parser.
++ * Summary: internals routines and limits exported by the parser.
+  * Description: this module exports a number of internal parsing routines
+  *              they are not really all intended for applications but
+  *              can prove useful doing low level processing.
+@@ -36,10 +36,43 @@ XMLPUBVAR unsigned int xmlParserMaxDepth;
+  * Maximum size allowed for a single text node when building a tree.
+  * This is not a limitation of the parser but a safety boundary feature,
+  * use XML_PARSE_HUGE option to override it.
++ * Introduced in 2.9.0
+  */
+ #define XML_MAX_TEXT_LENGTH 10000000
+ 
+ /**
++ * XML_MAX_NAME_LENGTH:
++ *
++ * Maximum size allowed for a markup identitier
++ * This is not a limitation of the parser but a safety boundary feature,
++ * use XML_PARSE_HUGE option to override it.
++ * Note that with the use of parsing dictionaries overriding the limit
++ * may result in more runtime memory usage in face of "unfriendly' content
++ * Introduced in 2.9.0
++ */
++#define XML_MAX_NAME_LENGTH 50000
++
++/**
++ * XML_MAX_DICTIONARY_LIMIT:
++ *
++ * Maximum size allowed by the parser for a dictionary by default
++ * This is not a limitation of the parser but a safety boundary feature,
++ * use XML_PARSE_HUGE option to override it.
++ * Introduced in 2.9.0
++ */
++#define XML_MAX_DICTIONARY_LIMIT 10000000
++
++/**
++ * XML_MAX_LOOKUP_LIMIT:
++ *
++ * Maximum size allowed by the parser for ahead lookup
++ * This is an upper boundary enforced by the parser to avoid bad
++ * behaviour on "unfriendly' content
++ * Introduced in 2.9.0
++ */
++#define XML_MAX_LOOKUP_LIMIT 10000000
++
++/**
+  * XML_MAX_NAMELEN:
+  *
+  * Identifiers can be longer, but this will be more costly
+diff --git a/include/libxml/xmlerror.h b/include/libxml/xmlerror.h
+index e924211..b5e8c77 100644
+--- a/include/libxml/xmlerror.h
++++ b/include/libxml/xmlerror.h
+@@ -205,6 +205,7 @@ typedef enum {
+     XML_WAR_ENTITY_REDEFINED, /* 107 */
+     XML_ERR_UNKNOWN_VERSION, /* 108 */
+     XML_ERR_VERSION_MISMATCH, /* 109 */
++    XML_ERR_NAME_TOO_LONG, /* 110 */
+     XML_NS_ERR_XML_NAMESPACE = 200,
+     XML_NS_ERR_UNDEFINED_NAMESPACE, /* 201 */
+     XML_NS_ERR_QNAME, /* 202 */
+diff --git a/parser.c b/parser.c
+index e1a082a..255f4dd 100644
+--- a/parser.c
++++ b/parser.c
+@@ -457,6 +457,9 @@ xmlFatalErr(xmlParserCtxtPtr ctxt, xmlParserErrors error, const char *info)
+         case XML_ERR_VERSION_MISSING:
+             errmsg = "Malformed declaration expecting version\n";
+             break;
++        case XML_ERR_NAME_TOO_LONG:
++            errmsg = "Name too long use XML_PARSE_HUGE option\n";
++            break;
+ #if 0
+         case:
+             errmsg = "\n";
+@@ -1864,6 +1867,11 @@ static void xmlSHRINK (xmlParserCtxtPtr ctxt) {
+ 	xmlGROW (ctxt);
+ 
+ static void xmlGROW (xmlParserCtxtPtr ctxt) {
++    if ((((ctxt->input->end - ctxt->input->cur) > XML_MAX_LOOKUP_LIMIT) ||
++         ((ctxt->input->cur - ctxt->input->base) > XML_MAX_LOOKUP_LIMIT)) &&
++        ((ctxt->options & XML_PARSE_HUGE) == 0)) {
++        xmlFatalErr(ctxt, XML_ERR_INTERNAL_ERROR, "Huge input lookup");
++    }
+     xmlParserInputGrow(ctxt->input, INPUT_CHUNK);
+     if ((*ctxt->input->cur == 0) &&
+         (xmlParserInputGrow(ctxt->input, INPUT_CHUNK) <= 0))
+@@ -3122,6 +3130,11 @@ xmlParseNameComplex(xmlParserCtxtPtr ctxt) {
+ 	    c = CUR_CHAR(l);
+ 	}
+     }
++    if ((len > XML_MAX_NAME_LENGTH) &&
++        ((ctxt->options & XML_PARSE_HUGE) == 0)) {
++        xmlFatalErr(ctxt, XML_ERR_NAME_TOO_LONG, "Name");
++        return(NULL);
++    }
+     if ((*ctxt->input->cur == '\n') && (ctxt->input->cur[-1] == '\r'))
+         return(xmlDictLookup(ctxt->dict, ctxt->input->cur - (len + 1), len));
+     return(xmlDictLookup(ctxt->dict, ctxt->input->cur - len, len));
+@@ -3171,6 +3184,11 @@ xmlParseName(xmlParserCtxtPtr ctxt) {
+ 	    in++;
+ 	if ((*in > 0) && (*in < 0x80)) {
+ 	    count = in - ctxt->input->cur;
++            if ((count > XML_MAX_NAME_LENGTH) &&
++                ((ctxt->options & XML_PARSE_HUGE) == 0)) {
++                xmlFatalErr(ctxt, XML_ERR_NAME_TOO_LONG, "Name");
++                return(NULL);
++            }
+ 	    ret = xmlDictLookup(ctxt->dict, ctxt->input->cur, count);
+ 	    ctxt->input->cur = in;
+ 	    ctxt->nbChars += count;
+@@ -3207,6 +3225,11 @@ xmlParseNCNameComplex(xmlParserCtxtPtr ctxt) {
+     while ((c != ' ') && (c != '>') && (c != '/') && /* test bigname.xml */
+ 	   (xmlIsNameChar(ctxt, c) && (c != ':'))) {
+ 	if (count++ > 100) {
++            if ((len > XML_MAX_NAME_LENGTH) &&
++                ((ctxt->options & XML_PARSE_HUGE) == 0)) {
++                xmlFatalErr(ctxt, XML_ERR_NAME_TOO_LONG, "NCName");
++                return(NULL);
++            }
+ 	    count = 0;
+ 	    GROW;
+ 	}
+@@ -3214,6 +3237,11 @@ xmlParseNCNameComplex(xmlParserCtxtPtr ctxt) {
+ 	NEXTL(l);
+ 	c = CUR_CHAR(l);
+     }
++    if ((len > XML_MAX_NAME_LENGTH) &&
++        ((ctxt->options & XML_PARSE_HUGE) == 0)) {
++        xmlFatalErr(ctxt, XML_ERR_NAME_TOO_LONG, "NCName");
++        return(NULL);
++    }
+     return(xmlDictLookup(ctxt->dict, ctxt->input->cur - len, len));
+ }
+ 
+@@ -3258,6 +3286,11 @@ xmlParseNCName(xmlParserCtxtPtr ctxt) {
+ 	    in++;
+ 	if ((*in > 0) && (*in < 0x80)) {
+ 	    count = in - ctxt->input->cur;
++            if ((count > XML_MAX_NAME_LENGTH) &&
++                ((ctxt->options & XML_PARSE_HUGE) == 0)) {
++                xmlFatalErr(ctxt, XML_ERR_NAME_TOO_LONG, "NCName");
++                return(NULL);
++            }
+ 	    ret = xmlDictLookup(ctxt->dict, ctxt->input->cur, count);
+ 	    ctxt->input->cur = in;
+ 	    ctxt->nbChars += count;
+@@ -3368,6 +3401,13 @@ xmlParseStringName(xmlParserCtxtPtr ctxt, const xmlChar** str) {
+ 	    while (xmlIsNameChar(ctxt, c)) {
+ 		if (len + 10 > max) {
+ 		    xmlChar *tmp;
++
++                    if ((len > XML_MAX_NAME_LENGTH) &&
++                        ((ctxt->options & XML_PARSE_HUGE) == 0)) {
++                        xmlFatalErr(ctxt, XML_ERR_NAME_TOO_LONG, "NCName");
++			xmlFree(buffer);
++                        return(NULL);
++                    }
+ 		    max *= 2;
+ 		    tmp = (xmlChar *) xmlRealloc(buffer,
+ 			                            max * sizeof(xmlChar));
+@@ -3387,6 +3427,11 @@ xmlParseStringName(xmlParserCtxtPtr ctxt, const xmlChar** str) {
+ 	    return(buffer);
+ 	}
+     }
++    if ((len > XML_MAX_NAME_LENGTH) &&
++        ((ctxt->options & XML_PARSE_HUGE) == 0)) {
++        xmlFatalErr(ctxt, XML_ERR_NAME_TOO_LONG, "NCName");
++        return(NULL);
++    }
+     *str = cur;
+     return(xmlStrndup(buf, len));
+ }
+@@ -3448,6 +3493,12 @@ xmlParseNmtoken(xmlParserCtxtPtr ctxt) {
+ 		if (len + 10 > max) {
+ 		    xmlChar *tmp;
+ 
++                    if ((max > XML_MAX_NAME_LENGTH) &&
++                        ((ctxt->options & XML_PARSE_HUGE) == 0)) {
++                        xmlFatalErr(ctxt, XML_ERR_NAME_TOO_LONG, "NmToken");
++                        xmlFree(buffer);
++                        return(NULL);
++                    }
+ 		    max *= 2;
+ 		    tmp = (xmlChar *) xmlRealloc(buffer,
+ 			                            max * sizeof(xmlChar));
+@@ -3468,6 +3519,11 @@ xmlParseNmtoken(xmlParserCtxtPtr ctxt) {
+     }
+     if (len == 0)
+         return(NULL);
++    if ((len > XML_MAX_NAME_LENGTH) &&
++        ((ctxt->options & XML_PARSE_HUGE) == 0)) {
++        xmlFatalErr(ctxt, XML_ERR_NAME_TOO_LONG, "NmToken");
++        return(NULL);
++    }
+     return(xmlStrndup(buf, len));
+ }
+ 
+@@ -3927,6 +3983,13 @@ xmlParseSystemLiteral(xmlParserCtxtPtr ctxt) {
+ 	if (len + 5 >= size) {
+ 	    xmlChar *tmp;
+ 
++            if ((size > XML_MAX_NAME_LENGTH) &&
++                ((ctxt->options & XML_PARSE_HUGE) == 0)) {
++                xmlFatalErr(ctxt, XML_ERR_NAME_TOO_LONG, "SystemLiteral");
++                xmlFree(buf);
++		ctxt->instate = (xmlParserInputState) state;
++                return(NULL);
++            }
+ 	    size *= 2;
+ 	    tmp = (xmlChar *) xmlRealloc(buf, size * sizeof(xmlChar));
+ 	    if (tmp == NULL) {
+@@ -4004,6 +4067,12 @@ xmlParsePubidLiteral(xmlParserCtxtPtr ctxt) {
+ 	if (len + 1 >= size) {
+ 	    xmlChar *tmp;
+ 
++            if ((size > XML_MAX_NAME_LENGTH) &&
++                ((ctxt->options & XML_PARSE_HUGE) == 0)) {
++                xmlFatalErr(ctxt, XML_ERR_NAME_TOO_LONG, "Public ID");
++                xmlFree(buf);
++                return(NULL);
++            }
+ 	    size *= 2;
+ 	    tmp = (xmlChar *) xmlRealloc(buf, size * sizeof(xmlChar));
+ 	    if (tmp == NULL) {
+@@ -8194,7 +8263,7 @@ xmlParseStartTag(xmlParserCtxtPtr ctxt) {
+ 		xmlFree(attvalue);
+ 	}
+ 
+-failed:     
++failed:
+ 
+ 	GROW
+ 	if ((RAW == '>') || (((RAW == '/') && (NXT(1) == '>'))))
+@@ -9379,14 +9448,21 @@ xmlParseCDSect(xmlParserCtxtPtr ctxt) {
+ 	if (len + 5 >= size) {
+ 	    xmlChar *tmp;
+ 
+-	    size *= 2;
+-	    tmp = (xmlChar *) xmlRealloc(buf, size * sizeof(xmlChar));
++            if ((size > XML_MAX_TEXT_LENGTH) &&
++                ((ctxt->options & XML_PARSE_HUGE) == 0)) {
++                xmlFatalErrMsgStr(ctxt, XML_ERR_CDATA_NOT_FINISHED,
++                             "CData section too big found", NULL);
++                xmlFree (buf);
++                return;
++            }
++	    tmp = (xmlChar *) xmlRealloc(buf, size * 2 * sizeof(xmlChar));
+ 	    if (tmp == NULL) {
+ 	        xmlFree(buf);
+ 		xmlErrMemory(ctxt, NULL);
+ 		return;
+ 	    }
+ 	    buf = tmp;
++	    size *= 2;
+ 	}
+ 	COPY_BUF(rl,buf,len,r);
+ 	r = s;
+@@ -14504,6 +14580,8 @@ xmlCtxtUseOptionsInternal(xmlParserCtxtPtr ctxt, int options, const char *encodi
+     if (options & XML_PARSE_HUGE) {
+ 	ctxt->options |= XML_PARSE_HUGE;
+         options -= XML_PARSE_HUGE;
++        if (ctxt->dict != NULL)
++            xmlDictSetLimit(ctxt->dict, 0);
+     }
+     if (options & XML_PARSE_OLDSAX) {
+ 	ctxt->options |= XML_PARSE_OLDSAX;
+diff --git a/parserInternals.c b/parserInternals.c
+index ff20435..e53f525 100644
+--- a/parserInternals.c
++++ b/parserInternals.c
+@@ -1618,6 +1618,8 @@ xmlInitParserCtxt(xmlParserCtxtPtr ctxt)
+         xmlErrMemory(NULL, "cannot initialize parser context\n");
+ 	return(-1);
+     }
++    xmlDictSetLimit(ctxt->dict, XML_MAX_DICTIONARY_LIMIT);
++
+     if (ctxt->sax == NULL)
+ 	ctxt->sax = (xmlSAXHandler *) xmlMalloc(sizeof(xmlSAXHandler));
+     if (ctxt->sax == NULL) {
+-- 
+1.7.11.2
+

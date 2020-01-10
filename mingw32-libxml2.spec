@@ -7,7 +7,7 @@
 
 Name:           mingw32-libxml2
 Version:        2.7.6
-Release:        3%{?dist}
+Release:        6%{?dist}
 Summary:        MinGW Windows libxml2 XML processing library
 
 
@@ -20,12 +20,50 @@ BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 # Not required for MinGW.
 #Patch0:         libxml2-multilib.patch
 
+Patch1: libxml2-2.7.6-xpath-leak.patch
+Patch2: libxml2-2.7.7-xpath-bug.patch
+Patch3: libxml2-2.7.7-xpath-leak.patch
+Patch4: libxml2-2.7.7-xpath-axis-semantic.patch
+Patch5: libxml2-2.7.7-xpath-axis-semantic2.patch
+Patch6: libxml2-2.7.7-xpath-rounding.patch
+Patch7: libxml2-2.7.8-xpath-freeing.patch
+Patch8: libxml2-2.7.8-xpath-freeing2.patch
+Patch9: CVE-2011-1944.patch
+Patch10: libxml2-2.7.8-xpath-hardening.patch
+Patch11: CVE-2011-0216.patch
+Patch12: CVE-2011-2834.patch
+Patch13: CVE-2011-3905.patch
+Patch14: CVE-2011-3919.patch
+Patch15: CVE-2012-0841.patch
+Patch16: force_randomization.patch
+Patch17: libxml2-Fix-a-failure-to-report-xmlreader-parsing-failures.patch
+Patch18: libxml2-Fix-parser-local-buffers-size-problems.patch
+Patch19: libxml2-Fix-entities-local-buffers-size-problems.patch
+Patch20: libxml2-Fix-an-error-in-previous-commit.patch
+Patch21: libxml2-Do-not-fetch-external-parsed-entities.patch
+Patch22: libxml2-Impose-a-reasonable-limit-on-attribute-size.patch
+Patch23: libxml2-Impose-a-reasonable-limit-on-comment-size.patch
+Patch24: libxml2-Impose-a-reasonable-limit-on-PI-size.patch
+Patch25: libxml2-Cleanups-and-new-limit-APIs-for-dictionaries.patch
+Patch26: libxml2-Introduce-some-default-parser-limits.patch
+Patch27: libxml2-Implement-some-default-limits-in-the-XPath-module.patch
+Patch28: libxml2-Fixup-limits-parser.patch
+Patch29: libxml2-Enforce-XML_PARSER_EOF-state-handling-through-the-parser.patch
+Patch30: libxml2-Avoid-quadratic-behaviour-in-some-push-parsing-cases.patch
+Patch31: libxml2-More-avoid-quadratic-behaviour.patch
+Patch32: libxml2-Strengthen-behaviour-of-the-push-parser-in-problematic-situations.patch
+Patch33: libxml2-More-fixups-on-the-push-parser-behaviour.patch
+Patch34: libxml2-Fix-a-segfault-on-XSD-validation-on-pattern-error.patch
+Patch35: libxml2-Fix-an-unimplemented-part-in-RNG-value-validation.patch
+Patch36: libxml2-Fix-an-off-by-one-pointer-access.patch
+Patch37: libxml2-Change-the-XPath-code-to-percolate-allocation-errors.patch
+Patch38: libxml2-Fix-potential-out-of-bound-access.patch
+
 # MinGW-specific patches.
 Patch1000:      mingw32-libxml2-2.7.2-with-modules.patch
 Patch1001:      mingw32-libxml2-static-build-compile-fix.patch
-Patch1002:      libxml2-gnome-bug-561340-fix.patch
 
-BuildArch:      noarch
+BuildArch:	noarch
 
 BuildRequires:  mingw32-filesystem >= 52
 BuildRequires:  mingw32-gcc
@@ -60,9 +98,47 @@ Static version of the MinGW Windows XML processing library.
 %prep
 %setup -q -n libxml2-%{version}
 
+%patch1 -p1
+%patch2 -p1
+%patch3 -p1
+%patch4 -p1
+%patch5 -p1
+%patch6 -p1
+%patch7 -p1
+%patch8 -p1
+%patch9 -p1
+%patch10 -p1
+%patch11 -p1
+%patch12 -p1
+%patch13 -p1
+%patch14 -p1
+%patch15 -p1
+%patch16 -p1
+%patch17 -p1
+%patch18 -p1
+%patch19 -p1
+%patch20 -p1
+%patch21 -p1
+%patch22 -p1
+%patch23 -p1
+%patch24 -p1
+%patch25 -p1
+%patch26 -p1
+%patch27 -p1
+%patch28 -p1
+%patch29 -p1
+%patch30 -p1
+%patch31 -p1
+%patch32 -p1
+%patch33 -p1
+%patch34 -p1
+%patch35 -p1
+%patch36 -p1
+%patch37 -p1
+%patch38 -p1
+
 %patch1000 -p1
 %patch1001 -p0
-%patch1002 -p0
 
 # Patched configure.in, so rebuild configure.
 libtoolize --force --copy
@@ -134,6 +210,25 @@ rm -rf $RPM_BUILD_ROOT
 
 
 %changelog
+* Fri Jan  4 2013 Kai Tietz <ktietz@redhat.com>
+- Synchronize patch-set with mainline-version.
+- Bump version to 5, 6.
+  Related: rhbz#891477
+
+* Thu Jan  3 2013 Kai Tietz <ktietz@redhat.com>
+- Change release number to 4.
+- Added patch libxml2-Fix-an-off-by-one-pointer-access.patch
+- Added patch libxml2-Fix-a-segfault-on-XSD-validation-on-pattern-error.patch
+- Added patch libxml2-Fix-entities-local-buffers-size-problems.patch
+- Added patch libxml2-gnome-bug-561340-fix.patch
+- Added patch for CVE-2012-0841
+- Added patch for CVE-2011-0216
+- Added patch for CVE-2011-2834
+- Added patch for CVE-2011-3919
+- Added patch for CVE-2011-1944
+- Added patch for CVE-2011-3905
+  Related: rhbz#891477
+
 * Mon Aug 22 2011 Kai Tietz <ktietz@redhat.com>
 - Adjusted version and rebuild using gcc 4.4.6
   Related: rhbz#722878

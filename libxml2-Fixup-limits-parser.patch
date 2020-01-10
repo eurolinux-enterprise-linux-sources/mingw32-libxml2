@@ -1,0 +1,26 @@
+From 9d2175ef616a1bc2d32d9601706a4bc8335e82b2 Mon Sep 17 00:00:00 2001
+From: Daniel Veillard <veillard@redhat.com>
+Date: Mon, 30 Jul 2012 15:41:10 +0800
+Subject: [PATCH] Fixup limits parser
+To: libvir-list@redhat.com
+
+Signed-off-by: Daniel Veillard <veillard@redhat.com>
+---
+ parser.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/parser.c b/parser.c
+index 255f4dd..8683a07 100644
+--- a/parser.c
++++ b/parser.c
+@@ -1871,6 +1871,7 @@ static void xmlGROW (xmlParserCtxtPtr ctxt) {
+          ((ctxt->input->cur - ctxt->input->base) > XML_MAX_LOOKUP_LIMIT)) &&
+         ((ctxt->options & XML_PARSE_HUGE) == 0)) {
+         xmlFatalErr(ctxt, XML_ERR_INTERNAL_ERROR, "Huge input lookup");
++        ctxt->instate = XML_PARSER_EOF;
+     }
+     xmlParserInputGrow(ctxt->input, INPUT_CHUNK);
+     if ((*ctxt->input->cur == 0) &&
+-- 
+1.7.11.2
+

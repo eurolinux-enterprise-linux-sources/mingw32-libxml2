@@ -1,0 +1,46 @@
+From 21fc8bd31379c551e7e87edb83823ffa49668a68 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?J=C3=BCri=20Aedla?= <asd@ut.ee>
+Date: Mon, 7 May 2012 15:06:56 +0800
+Subject: [PATCH] Fix an off by one pointer access
+To: libvir-list@redhat.com
+
+getting out of the range of memory allocated for xpointer decoding
+
+Signed-off-by: Daniel Veillard <veillard@redhat.com>
+---
+ xpointer.c | 15 ++++-----------
+ 1 file changed, 4 insertions(+), 11 deletions(-)
+
+diff --git a/xpointer.c b/xpointer.c
+index 37afa3a..0b463dd 100644
+--- a/xpointer.c
++++ b/xpointer.c
+@@ -1007,21 +1007,14 @@ xmlXPtrEvalXPtrPart(xmlXPathParserContextPtr ctxt, xmlChar *name) {
+ 		NEXT;
+ 		break;
+ 	    }
+-	    *cur++ = CUR;
+ 	} else if (CUR == '(') {
+ 	    level++;
+-	    *cur++ = CUR;
+ 	} else if (CUR == '^') {
+-	    NEXT;
+-	    if ((CUR == ')') || (CUR == '(') || (CUR == '^')) {
+-		*cur++ = CUR;
+-	    } else {
+-		*cur++ = '^';
+-		*cur++ = CUR;
+-	    }
+-	} else {
+-	    *cur++ = CUR;
++            if ((NXT(1) == ')') || (NXT(1) == '(') || (NXT(1) == '^')) {
++                NEXT;
++            }
+ 	}
++        *cur++ = CUR;
+ 	NEXT;
+     }
+     *cur = 0;
+-- 
+1.7.11.4
+

@@ -1,0 +1,97 @@
+From 88dff4314016f8cb8de9908eaecb84708c90360d Mon Sep 17 00:00:00 2001
+From: Daniel Veillard <veillard@redhat.com>
+Date: Thu, 19 Jul 2012 11:58:47 +0800
+Subject: [PATCH] Impose a reasonable limit on comment size
+To: libvir-list@redhat.com
+
+Unless the XML_PARSE_HUGE option is given to the parser,
+the value is XML_MAX_TEXT_LENGTH, i.e. the same than for a
+text node within content.
+Also cleanup some unsigned int used for memory size.
+
+Signed-off-by: Daniel Veillard <veillard@redhat.com>
+---
+ parser.c | 33 ++++++++++++++++++++++++++-------
+ 1 file changed, 26 insertions(+), 7 deletions(-)
+
+diff --git a/parser.c b/parser.c
+index f21d6f8..58eaf3f 100644
+--- a/parser.c
++++ b/parser.c
+@@ -4421,11 +4421,12 @@ xmlParseExternalID(xmlParserCtxtPtr ctxt, xmlChar **publicID, int strict) {
+  * [15] Comment ::= '<!--' ((Char - '-') | ('-' (Char - '-')))* '-->'
+  */
+ static void
+-xmlParseCommentComplex(xmlParserCtxtPtr ctxt, xmlChar *buf, int len, int size) {
++xmlParseCommentComplex(xmlParserCtxtPtr ctxt, xmlChar *buf,
++                       size_t len, size_t size) {
+     int q, ql;
+     int r, rl;
+     int cur, l;
+-    int count = 0;
++    size_t count = 0;
+     int inputid;
+ 
+     inputid = ctxt->input->id;
+@@ -4471,16 +4472,26 @@ xmlParseCommentComplex(xmlParserCtxtPtr ctxt, xmlChar *buf, int len, int size) {
+ 	if ((r == '-') && (q == '-')) {
+ 	    xmlFatalErr(ctxt, XML_ERR_HYPHEN_IN_COMMENT, NULL);
+ 	}
++        if ((len > XML_MAX_TEXT_LENGTH) &&
++            ((ctxt->options & XML_PARSE_HUGE) == 0)) {
++            xmlFatalErrMsgStr(ctxt, XML_ERR_COMMENT_NOT_FINISHED,
++                         "Comment too big found", NULL);
++            xmlFree (buf);
++            return;
++        }
+ 	if (len + 5 >= size) {
+ 	    xmlChar *new_buf;
+-	    size *= 2;
+-	    new_buf = (xmlChar *) xmlRealloc(buf, size * sizeof(xmlChar));
++            size_t new_size;
++
++	    new_size = size * 2;
++	    new_buf = (xmlChar *) xmlRealloc(buf, new_size);
+ 	    if (new_buf == NULL) {
+ 		xmlFree (buf);
+ 		xmlErrMemory(ctxt, NULL);
+ 		return;
+ 	    }
+ 	    buf = new_buf;
++            size = new_size;
+ 	}
+ 	COPY_BUF(ql,buf,len,q);
+ 	q = r;
+@@ -4541,11 +4552,12 @@ not_terminated:
+ void
+ xmlParseComment(xmlParserCtxtPtr ctxt) {
+     xmlChar *buf = NULL;
+-    int size = XML_PARSER_BUFFER_SIZE;
+-    int len = 0;
++    size_t size = XML_PARSER_BUFFER_SIZE;
++    size_t len = 0;
+     xmlParserInputState state;
+     const xmlChar *in;
+-    int nbchar = 0, ccol;
++    size_t nbchar = 0;
++    int ccol;
+     int inputid;
+ 
+     /*
+@@ -4625,6 +4637,13 @@ get_more:
+ 		buf[len] = 0;
+ 	    }
+ 	}
++        if ((len > XML_MAX_TEXT_LENGTH) &&
++            ((ctxt->options & XML_PARSE_HUGE) == 0)) {
++            xmlFatalErrMsgStr(ctxt, XML_ERR_COMMENT_NOT_FINISHED,
++                         "Comment too big found", NULL);
++            xmlFree (buf);
++            return;
++        }
+ 	ctxt->input->cur = in;
+ 	if (*in == 0xA) {
+ 	    in++;
+-- 
+1.7.11.2
+

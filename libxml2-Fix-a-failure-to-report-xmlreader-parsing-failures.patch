@@ -1,0 +1,37 @@
+From 1aba695bb3bfcaf047b6cefb272c7a59022fb7bf Mon Sep 17 00:00:00 2001
+From: Daniel Veillard <veillard@redhat.com>
+Date: Wed, 18 Jul 2012 17:39:56 +0800
+Subject: [PATCH] Fix a failure to report xmlreader parsing failures
+To: libvir-list@redhat.com
+
+Related to https://bugzilla.gnome.org/show_bug.cgi?id=654567
+the problem is that the provided patch failed to raise an error
+on xmlTextReaderRead() return when an actual parsing error occured
+
+Conflicts:
+	xmlreader.c: context change
+
+Signed-off-by: Daniel Veillard <veillard@redhat.com>
+---
+ xmlreader.c | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/xmlreader.c b/xmlreader.c
+index c2afac7..1e09fb7 100644
+--- a/xmlreader.c
++++ b/xmlreader.c
+@@ -900,6 +900,11 @@ xmlTextReaderPushData(xmlTextReaderPtr reader) {
+ 	}
+     }
+     reader->state = oldstate;
++    if (reader->ctxt->wellFormed == 0) {
++	reader->mode = XML_TEXTREADER_MODE_EOF;
++        return(-1);
++    }
++
+     return(0);
+ }
+ 
+-- 
+1.7.11.2
+

@@ -1,0 +1,67 @@
+From 0efaea3ab28119b03d20a972bd91b9c1911dc2a1 Mon Sep 17 00:00:00 2001
+From: Daniel Veillard <veillard@redhat.com>
+Date: Thu, 10 Nov 2011 18:08:33 +0800
+Subject: [PATCH] Fix an unimplemented part in RNG value validation
+To: libvir-list@redhat.com
+
+Forgot to implement <optional> this was raised again
+in https://bugzilla.redhat.com/show_bug.cgi?id=752393
+as this make libxml2 fail to validate against ODF RNGs
+
+Daniel
+
+Signed-off-by: Daniel Veillard <veillard@redhat.com>
+---
+ relaxng.c | 29 +++++++++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
+
+diff --git a/relaxng.c b/relaxng.c
+index 075fc4a..e9f1311 100644
+--- a/relaxng.c
++++ b/relaxng.c
+@@ -8883,6 +8883,11 @@ xmlRelaxNGValidateValue(xmlRelaxNGValidCtxtPtr ctxt,
+         case XML_RELAXNG_ZEROORMORE:{
+                 xmlChar *cur, *temp;
+ 
++                if ((ctxt->state->value == NULL) ||
++                    (*ctxt->state->value == 0)) {
++                    ret = 0;
++                    break;
++                }
+                 oldflags = ctxt->flags;
+                 ctxt->flags |= FLAGS_IGNORABLE;
+                 cur = ctxt->state->value;
+@@ -8904,6 +8909,30 @@ xmlRelaxNGValidateValue(xmlRelaxNGValidCtxtPtr ctxt,
+ 		    xmlRelaxNGPopErrors(ctxt, 0);
+                 break;
+             }
++        case XML_RELAXNG_OPTIONAL:{
++                xmlChar *temp;
++
++                if ((ctxt->state->value == NULL) ||
++                    (*ctxt->state->value == 0)) {
++                    ret = 0;
++                    break;
++                }
++                oldflags = ctxt->flags;
++                ctxt->flags |= FLAGS_IGNORABLE;
++                temp = ctxt->state->value;
++                ret = xmlRelaxNGValidateValue(ctxt, define->content);
++                ctxt->flags = oldflags;
++                if (ret != 0) {
++                    ctxt->state->value = temp;
++                    if (ctxt->errNr > 0)
++                        xmlRelaxNGPopErrors(ctxt, 0);
++                    ret = 0;
++                    break;
++                }
++		if (ctxt->errNr > 0)
++		    xmlRelaxNGPopErrors(ctxt, 0);
++                break;
++            }
+         case XML_RELAXNG_EXCEPT:{
+                 xmlRelaxNGDefinePtr list;
+ 
+-- 
+1.7.11.2
+

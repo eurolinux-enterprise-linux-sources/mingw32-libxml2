@@ -1,0 +1,110 @@
+From 7246cd7874626e1c3915d410a83226689cbcb1d4 Mon Sep 17 00:00:00 2001
+From: Daniel Veillard <veillard@redhat.com>
+Date: Thu, 19 Jul 2012 11:25:16 +0800
+Subject: [PATCH] Impose a reasonable limit on attribute size
+To: libvir-list@redhat.com
+
+Unless the XML_PARSE_HUGE option is given to the parser,
+the value is XML_MAX_TEXT_LENGTH, i.e. the same than for a
+text node within content.
+
+Signed-off-by: Daniel Veillard <veillard@redhat.com>
+---
+ parser.c | 50 ++++++++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 48 insertions(+), 2 deletions(-)
+
+diff --git a/parser.c b/parser.c
+index f874344..f21d6f8 100644
+--- a/parser.c
++++ b/parser.c
+@@ -3660,6 +3660,16 @@ xmlParseAttValueComplex(xmlParserCtxtPtr ctxt, int *attlen, int normalize) {
+     c = CUR_CHAR(l);
+     while ((NXT(0) != limit) && /* checked */
+            (IS_CHAR(c)) && (c != '<')) {
++        /*
++         * Impose a reasonable limit on attribute size, unless XML_PARSE_HUGE
++         * special option is given
++         */
++        if ((len > XML_MAX_TEXT_LENGTH) &&
++            ((ctxt->options & XML_PARSE_HUGE) == 0)) {
++            xmlFatalErrMsg(ctxt, XML_ERR_ATTRIBUTE_NOT_FINISHED,
++                           "AttValue lenght too long\n");
++            goto mem_error;
++        }
+ 	if (c == 0) break;
+ 	if (c == '&') {
+ 	    in_space = 0;
+@@ -8521,6 +8531,12 @@ xmlParseAttValueInternal(xmlParserCtxtPtr ctxt, int *len, int *alloc,
+ 		    in = in + delta;
+ 		}
+ 		end = ctxt->input->end;
++                if (((in - start) > XML_MAX_TEXT_LENGTH) &&
++                    ((ctxt->options & XML_PARSE_HUGE) == 0)) {
++                    xmlFatalErrMsg(ctxt, XML_ERR_ATTRIBUTE_NOT_FINISHED,
++                                   "AttValue lenght too long\n");
++                    return(NULL);
++                }
+ 	    }
+ 	}
+ 	while ((in < end) && (*in != limit) && (*in >= 0x20) &&
+@@ -8535,6 +8551,12 @@ xmlParseAttValueInternal(xmlParserCtxtPtr ctxt, int *len, int *alloc,
+ 		    in = in + delta;
+ 		}
+ 		end = ctxt->input->end;
++                if (((in - start) > XML_MAX_TEXT_LENGTH) &&
++                    ((ctxt->options & XML_PARSE_HUGE) == 0)) {
++                    xmlFatalErrMsg(ctxt, XML_ERR_ATTRIBUTE_NOT_FINISHED,
++                                   "AttValue lenght too long\n");
++                    return(NULL);
++                }
+ 	    }
+ 	}
+ 	last = in;
+@@ -8556,8 +8578,20 @@ xmlParseAttValueInternal(xmlParserCtxtPtr ctxt, int *len, int *alloc,
+ 		    last = last + delta;
+ 		}
+ 		end = ctxt->input->end;
+-	    }
+-	}
++                if (((in - start) > XML_MAX_TEXT_LENGTH) &&
++                    ((ctxt->options & XML_PARSE_HUGE) == 0)) {
++                    xmlFatalErrMsg(ctxt, XML_ERR_ATTRIBUTE_NOT_FINISHED,
++                                   "AttValue lenght too long\n");
++                    return(NULL);
++                }
++	    }
++	}
++        if (((in - start) > XML_MAX_TEXT_LENGTH) &&
++            ((ctxt->options & XML_PARSE_HUGE) == 0)) {
++            xmlFatalErrMsg(ctxt, XML_ERR_ATTRIBUTE_NOT_FINISHED,
++                           "AttValue lenght too long\n");
++            return(NULL);
++        }
+ 	if (*in != limit) goto need_complex;
+     } else {
+ 	while ((in < end) && (*in != limit) && (*in >= 0x20) &&
+@@ -8572,9 +8606,21 @@ xmlParseAttValueInternal(xmlParserCtxtPtr ctxt, int *len, int *alloc,
+ 		    in = in + delta;
+ 		}
+ 		end = ctxt->input->end;
++                if (((in - start) > XML_MAX_TEXT_LENGTH) &&
++                    ((ctxt->options & XML_PARSE_HUGE) == 0)) {
++                    xmlFatalErrMsg(ctxt, XML_ERR_ATTRIBUTE_NOT_FINISHED,
++                                   "AttValue lenght too long\n");
++                    return(NULL);
++                }
+ 	    }
+ 	}
+ 	last = in;
++        if (((in - start) > XML_MAX_TEXT_LENGTH) &&
++            ((ctxt->options & XML_PARSE_HUGE) == 0)) {
++            xmlFatalErrMsg(ctxt, XML_ERR_ATTRIBUTE_NOT_FINISHED,
++                           "AttValue lenght too long\n");
++            return(NULL);
++        }
+ 	if (*in != limit) goto need_complex;
+     }
+     in++;
+-- 
+1.7.11.2
+

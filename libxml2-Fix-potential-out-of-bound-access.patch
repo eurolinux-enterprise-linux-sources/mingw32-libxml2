@@ -1,0 +1,30 @@
+From 467b7ea3dd042d214d4eecce487cf83ae602d496 Mon Sep 17 00:00:00 2001
+From: Daniel Veillard <veillard@redhat.com>
+Date: Mon, 29 Oct 2012 10:39:55 +0800
+Subject: [PATCH] Fix potential out of bound access
+To: libvir-list@redhat.com
+
+For https://bugzilla.redhat.com/show_bug.cgi?id=880476
+CVE-2012-5134 libxml2: Heap-buffer-underflow in xmlParseAttValueComplex
+
+Signed-off-by: Daniel Veillard <veillard@redhat.com>
+---
+ parser.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/parser.c b/parser.c
+index 8eedb6e..9dc2232 100644
+--- a/parser.c
++++ b/parser.c
+@@ -3898,7 +3898,7 @@ xmlParseAttValueComplex(xmlParserCtxtPtr ctxt, int *attlen, int normalize) {
+         goto error;
+ 
+     if ((in_space) && (normalize)) {
+-        while (buf[len - 1] == 0x20) len--;
++        while ((len > 0) && (buf[len - 1] == 0x20)) len--;
+     }
+     buf[len] = 0;
+     if (RAW == '<') {
+-- 
+1.7.11.7
+

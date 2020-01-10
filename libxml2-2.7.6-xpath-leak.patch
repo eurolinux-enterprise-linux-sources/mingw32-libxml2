@@ -1,0 +1,61 @@
+commit 729601f15772c19778062b98bd0716d8f5c2af3b
+Author: Martin <gzlist@googlemail.com>
+Date:   Mon Oct 12 22:42:26 2009 +0200
+
+    Fix memory leak in xmlXPathEvalExpression()
+    
+    * xpath.c: plug some leaks when parsing misformed XPath expressions
+    * python/tests/xpathleak.py: expand the regression tests for those
+
+diff --git a/python/tests/xpathleak.py b/python/tests/xpathleak.py
+index dcc144c..39f49e3 100644
+--- a/python/tests/xpathleak.py
++++ b/python/tests/xpathleak.py
+@@ -15,6 +15,14 @@ expect="""--> Invalid expression
+ --> xmlXPathEval: evaluation failed
+ --> Invalid expression
+ --> xmlXPathEval: evaluation failed
++--> Invalid expression
++--> xmlXPathEval: evaluation failed
++--> Invalid expression
++--> xmlXPathEval: evaluation failed
++--> Invalid expression
++--> xmlXPathEval: evaluation failed
++--> Invalid expression
++--> xmlXPathEval: evaluation failed
+ """
+ err=""
+ def callback(ctx, str):
+@@ -27,7 +35,11 @@ libxml2.registerErrorHandler(callback, "-->")
+ doc = libxml2.parseDoc("<fish/>")
+ ctxt = doc.xpathNewContext()
+ ctxt.setContextNode(doc)
+-for expr in (":false()","bad:()","bad(:)",":bad(:)","bad:(:)","bad:bad(:)"):
++badexprs = (
++	":false()", "bad:()", "bad(:)", ":bad(:)", "bad:(:)", "bad:bad(:)",
++	"a:/b", "/c:/d", "//e:/f", "g://h"
++	)
++for expr in badexprs:
+ 	try:
+ 		ctxt.xpathEval(expr)
+ 	except libxml2.xpathError, e:
+diff --git a/xpath.c b/xpath.c
+index 5b84d22..8482c40 100644
+--- a/xpath.c
++++ b/xpath.c
+@@ -11333,6 +11333,7 @@ xmlXPathCompRelativeLocationPath
+ 	SKIP_BLANKS;
+     }
+     xmlXPathCompStep(ctxt);
++    CHECK_ERROR;
+     SKIP_BLANKS;
+     while (CUR == '/') {
+ 	if ((CUR == '/') && (NXT(1) == '/')) {
+@@ -11392,6 +11393,7 @@ xmlXPathCompLocationPath(xmlXPathParserContextPtr ctxt) {
+ 		     (CUR == '@') || (CUR == '*')))
+ 		    xmlXPathCompRelativeLocationPath(ctxt);
+ 	    }
++	    CHECK_ERROR;
+ 	}
+     }
+ }

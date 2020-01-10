@@ -1,0 +1,77 @@
+commit ea90b894146030c214a7df6d8375310174f134b9
+Author: Daniel Veillard <veillard@redhat.com>
+Date:   Fri Oct 22 15:50:50 2010 +0200
+
+    Fix a change of semantic on XPath preceding and following axis
+    
+    This was introduced in the prevous fix, while preceding-sibling and
+    following sibling axis are empty for attributes and namespaces,
+    preceding and following axis should still work based on the parent
+    element. However the parent element is not available for a namespace
+    node, so we keep the axis empty in that case.
+
+diff --git a/xpath.c b/xpath.c
+index 9d47618..3352a5e 100644
+--- a/xpath.c
++++ b/xpath.c
+@@ -8106,17 +8106,17 @@ xmlXPathNextPrecedingSibling(xmlXPathParserContextPtr ctxt, xmlNodePtr cur) {
+ xmlNodePtr
+ xmlXPathNextFollowing(xmlXPathParserContextPtr ctxt, xmlNodePtr cur) {
+     if ((ctxt == NULL) || (ctxt->context == NULL)) return(NULL);
+-    if ((ctxt->context->node->type == XML_ATTRIBUTE_NODE) ||
+-	(ctxt->context->node->type == XML_NAMESPACE_DECL))
+-	return(NULL);
+-    if (cur != NULL) {
+-        if ((cur->type == XML_ATTRIBUTE_NODE) ||
+-            (cur->type == XML_NAMESPACE_DECL))
++    if ((cur != NULL) && (cur->type  != XML_ATTRIBUTE_NODE) &&
++        (cur->type != XML_NAMESPACE_DECL) && (cur->children != NULL))
++        return(cur->children);
++
++    if (cur == NULL) {
++        cur = ctxt->context->node;
++        if (cur->type == XML_NAMESPACE_DECL)
+             return(NULL);
+-        if (cur->children != NULL)
+-            return cur->children ;
++        if (cur->type == XML_ATTRIBUTE_NODE)
++            cur = cur->parent;
+     }
+-    if (cur == NULL) cur = ctxt->context->node;
+     if (cur == NULL) return(NULL) ; /* ERROR */
+     if (cur->next != NULL) return(cur->next) ;
+     do {
+@@ -8170,11 +8170,13 @@ xmlNodePtr
+ xmlXPathNextPreceding(xmlXPathParserContextPtr ctxt, xmlNodePtr cur)
+ {
+     if ((ctxt == NULL) || (ctxt->context == NULL)) return(NULL);
+-    if ((ctxt->context->node->type == XML_ATTRIBUTE_NODE) ||
+-	(ctxt->context->node->type == XML_NAMESPACE_DECL))
+-	return(NULL);
+-    if (cur == NULL)
++    if (cur == NULL) {
+         cur = ctxt->context->node;
++        if (cur->type == XML_NAMESPACE_DECL)
++            return(NULL);
++        if (cur->type == XML_ATTRIBUTE_NODE)
++            return(cur->parent);
++    }
+     if (cur == NULL)
+ 	return (NULL);
+     if ((cur->prev != NULL) && (cur->prev->type == XML_DTD_NODE))
+@@ -8214,13 +8216,12 @@ xmlXPathNextPrecedingInternal(xmlXPathParserContextPtr ctxt,
+                               xmlNodePtr cur)
+ {
+     if ((ctxt == NULL) || (ctxt->context == NULL)) return(NULL);
+-    if ((ctxt->context->node->type == XML_ATTRIBUTE_NODE) ||
+-	(ctxt->context->node->type == XML_NAMESPACE_DECL))
+-	return(NULL);
+     if (cur == NULL) {
+         cur = ctxt->context->node;
+         if (cur == NULL)
+             return (NULL);
++        if (cur->type == XML_NAMESPACE_DECL)
++            return (NULL);
+         ctxt->ancestor = cur->parent;
+     }
+     if ((cur->prev != NULL) && (cur->prev->type == XML_DTD_NODE))

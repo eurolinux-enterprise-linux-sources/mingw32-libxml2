@@ -1,0 +1,25 @@
+commit 2f3523f61f1c7a2a0521c2f6c0db6c80e1cc4111
+Author: Daniel Veillard <veillard@redhat.com>
+Date:   Fri Oct 15 18:30:29 2010 +0200
+
+    Fix a leak in XPath compilation
+    
+    Sometimes a not well formed XPath expression could lead to a
+    leak as reported by Ralf Junker <ralfjunker@gmx.de>
+
+diff --git a/xpath.c b/xpath.c
+index 8b77af3..9d47618 100644
+--- a/xpath.c
++++ b/xpath.c
+@@ -11261,7 +11261,10 @@ xmlXPathCompStep(xmlXPathParserContextPtr ctxt) {
+ 	    }
+ 	}
+ 
+-	CHECK_ERROR;
++        if (ctxt->error != XPATH_EXPRESSION_OK) {
++            xmlFree(name);
++            return;
++        }
+ 
+ 	name = xmlXPathCompNodeTest(ctxt, &test, &type, &prefix, name);
+ 	if (test == 0)

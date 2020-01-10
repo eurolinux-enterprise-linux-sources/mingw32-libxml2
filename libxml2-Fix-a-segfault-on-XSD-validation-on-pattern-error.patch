@@ -1,0 +1,56 @@
+From 6aede434dbda99834847aca03b4edc4d198dcc1d Mon Sep 17 00:00:00 2001
+From: Daniel Veillard <veillard@redhat.com>
+Date: Fri, 17 Aug 2012 20:34:05 +0800
+Subject: [PATCH] Fix a segfault on XSD validation on pattern error
+To: libvir-list@redhat.com
+
+As reported by Sven <sven@e7o.de>:
+The following pattern will cause a segmentation fault in my
+Apache (using PHP5 to validate a XML against a XSD):
+
+<xs:pattern value="(.*)|"/>
+
+Fix a cascade of error handling failures which led to the
+crash in that scenario.
+
+Signed-off-by: Daniel Veillard <veillard@redhat.com>
+---
+ xmlregexp.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/xmlregexp.c b/xmlregexp.c
+index 2a501ad..1f5525c 100644
+--- a/xmlregexp.c
++++ b/xmlregexp.c
+@@ -3199,7 +3199,7 @@ xmlFARegExec(xmlRegexpPtr comp, const xmlChar *content) {
+         memset(exec->counts, 0, comp->nbCounters * sizeof(int));
+     } else
+ 	exec->counts = NULL;
+-    while ((exec->status == 0) &&
++    while ((exec->status == 0) && (exec->state != NULL) &&
+ 	   ((exec->inputString[exec->index] != 0) ||
+ 	    ((exec->state != NULL) &&
+ 	     (exec->state->type != XML_REGEXP_FINAL_STATE)))) {
+@@ -3453,6 +3453,8 @@ error:
+ 	}
+ 	xmlFree(exec->rollbacks);
+     }
++    if (exec->state == NULL)
++        return(-1);
+     if (exec->counts != NULL)
+ 	xmlFree(exec->counts);
+     if (exec->status == 0)
+@@ -5359,6 +5361,10 @@ xmlFAParseRegExp(xmlRegParserCtxtPtr ctxt, int top) {
+     end = ctxt->state;
+     while ((CUR == '|') && (ctxt->error == 0)) {
+ 	NEXT;
++	if (CUR == 0) {
++	    ERROR("expecting a branch after |")
++	    return;
++	}
+ 	ctxt->state = start;
+ 	ctxt->end = NULL;
+ 	xmlFAParseBranch(ctxt, end);
+-- 
+1.7.11.2
+
